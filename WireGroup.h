@@ -7,35 +7,28 @@
 #include <set>
 
 #include "defines.h"
+#include "Tile.h"
 
 class Gate;
 
-class WireGroup
+class WireGroup: public Tile
 {
-public:
-	enum Side
-	{
-		N, S, W, E
-	};
-	enum Type
-	{
-		WIRE, INPUT
-	};
-private:
 	std::map<v, Type> wireTiles;
 	std::set<v>& crosses;
+	std::map<v, Gate>& gates;
 	bool state = false;
-	std::map<v, Gate*> inputs;
-	bool checkSide(cvr pos, Type type, Side side);
+	std::vector<Gate*> outputs;
+	
 public:
-	WireGroup(std::set<v>& crosses) : crosses(crosses) {}
+	WireGroup(std::set<v>& crosses, std::map<v, Gate>& gates) : crosses(crosses), gates(gates) {}
 	WireGroup(const WireGroup&& another);
 	WireGroup(const WireGroup& another);
-	WireGroup* doesPointConnect(cvr pos, Type type);
+	void linkGate(Gate* gate);
+	void unLinkGate(Gate* gate);
 	void merge(WireGroup&& another);
-	static cvr neighbour(cvr pos, Side side);
 	WireGroup& operator=(const WireGroup& another);
 
 	friend class Scene;
+	friend class Gate;
 };
 

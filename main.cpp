@@ -5,7 +5,7 @@ using namespace std;
 
 int main()
 {
-	Scesdawne s;
+	Scene s;
 	s.eventLoop();
 	return 0;
 }

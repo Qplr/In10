@@ -2,26 +2,22 @@
 
 #include "SFML/Graphics.hpp"
 
-#include <map>
-
 #include "defines.h"
+#include "Tile.h"
 
 class WireGroup;
 
-class Gate
+class Gate: public Tile
 {
+	bool state = false;
+	Type type = VOID;
+	std::vector<WireGroup*> outputs, inputs;
 public:
-	enum Type
-	{
-		OR, NOR, AND, NAND, XOR, XNOR
-	};
-private:
-	int id;
-	bool state;
-	Type type;
-	std::map<v, WireGroup*> outputs;
-public:
+	Gate() {}
 	Gate(Type type);
+	void linkWire(WireGroup* wg);
+	void unLinkWire(WireGroup* wg);
 	friend class Scene;
+	friend class WireGroup;
 };
 

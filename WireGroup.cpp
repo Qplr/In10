@@ -1,64 +1,44 @@
 #include "WireGroup.h"
+#include "Gate.h"
 
-bool WireGroup::checkSide(cvr pos, Type type, Side side) // true - the object has joined new point and other neightbouring wire groups
-{
-	auto tempPos = neighbour(pos, side);
-
-	while (crosses.contains(tempPos)) //skipping all crosses in specified direction
-		tempPos = neighbour(tempPos, side);
-
-	if (wireTiles.contains(tempPos)) // if the tile to the specified side exists
-		return true;
-	return false;
-}
-
-WireGroup::WireGroup(const WireGroup&& another) : crosses(another.crosses)
+WireGroup::WireGroup(const WireGroup&& another) : crosses(another.crosses), gates(another.gates)
 {
 	wireTiles = std::move(another.wireTiles);
-	inputs = std::move(another.inputs);
+	outputs = std::move(another.outputs);
 }
 
-WireGroup::WireGroup(const WireGroup& another) : crosses(another.crosses)
+WireGroup::WireGroup(const WireGroup& another) : crosses(another.crosses), gates(another.gates)
 {
 	*this = another;
 }
 
-WireGroup* WireGroup::doesPointConnect(cvr pos, Type type)
+void WireGroup::linkGate(Gate* gate)
 {
-	if (checkSide(pos, type, N)) // if point was joined - end and return this for reference
-		return this;
-	if (checkSide(pos, type, S))
-		return this;
-	if (checkSide(pos, type, W))
-		return this;
-	if (checkSide(pos, type, E))
-		return this;
-	return nullptr;
+	outputs.push_back(gate);
+	gate->inputs.push_back(this);
+}
+
+void WireGroup::unLinkGate(Gate* gate)
+{
+	for (int i = 0; i < outputs.size(); i++)
+		if (gate == outputs[i])
+			outputs.erase(outputs.begin() + i);
+	for (int i = 0; i < gate->inputs.size(); i++)
+		if (gate->inputs[i] == this)
+			gate->inputs.erase(gate->inputs.begin() + i);
 }
 
 void WireGroup::merge(WireGroup&& another)
 {
 	wireTiles.merge(another.wireTiles);
-	inputs.merge(another.inputs);
-	state = another.state;
-}
-
-cvr WireGroup::neighbour(cvr pos, Side side)
-{
-	switch (side)
-	{
-	case N: return v(pos.x, pos.y - 1);
-	case S: return v(pos.x, pos.y + 1);
-	case W: return v(pos.x - 1, pos.y);
-	case E: return v(pos.x + 1, pos.y);
-	default: return pos;
-	}
+	outputs.insert(outputs.end(), another.outputs.begin(), another.outputs.end());
+	state |= another.state;
 }
 
 WireGroup& WireGroup::operator=(const WireGroup& another)
 {
 	wireTiles = another.wireTiles;
-	inputs = another.inputs;
+	outputs = another.outputs;
 	state = another.state;
 	return *this;
 }
