@@ -22,8 +22,7 @@ bool Scene::tileEmpty(cvr pos) const
 
 void Scene::deleteWireGroup(int index)
 {
-	for (auto& gate : gates)
-		gate.second.unLinkWire(&wireGroups[index]);
+	wireGroups[index].unlinkAll();
 	wireGroups.erase(wireGroups.begin() + index);
 }
 
@@ -129,7 +128,7 @@ void Scene::placeWire(cvr pos, Tile::Type type)
 			if (resultWireGroup != -1) // if we need to merge 2 groups
 			{
 				wireGroups[resultWireGroup].merge(std::move(wireGroups[i]));
-				deleteWireGroup(i);
+				wireGroups.erase(wireGroups.begin() + i);
 				i--;
 			}
 			else
@@ -159,6 +158,9 @@ void Scene::placeWire(cvr pos, Tile::Type type)
 				wireGroup->linkGate(gateAndMode.first);
 		}
 	}
+	system("cls");
+	for (auto& wg : wireGroups)
+		std::cout << unsigned int(&wg) << " o: " << wg.outputs.size() << " i: " << wg.inputs.size() << std::endl;
 }
 
 void Scene::placeGate(cvr pos, Tile::Type type)

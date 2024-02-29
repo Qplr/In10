@@ -17,6 +17,7 @@ public:
 	Gate(Type type);
 	void linkWire(WireGroup* wg);
 	void unLinkWire(WireGroup* wg);
+	void unlinkAll();
 	friend class Scene;
 	friend class WireGroup;
 };

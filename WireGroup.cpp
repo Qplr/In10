@@ -1,13 +1,12 @@
 #include "WireGroup.h"
 #include "Gate.h"
 
-WireGroup::WireGroup(const WireGroup&& another) : crosses(another.crosses), gates(another.gates)
+WireGroup::WireGroup(const WireGroup&& another) : crosses(another.crosses)
 {
-	wireTiles = std::move(another.wireTiles);
-	outputs = std::move(another.outputs);
+	*this = another;
 }
 
-WireGroup::WireGroup(const WireGroup& another) : crosses(another.crosses), gates(another.gates)
+WireGroup::WireGroup(const WireGroup& another) : crosses(another.crosses)
 {
 	*this = another;
 }
@@ -28,10 +27,17 @@ void WireGroup::unLinkGate(Gate* gate)
 			gate->inputs.erase(gate->inputs.begin() + i);
 }
 
+void WireGroup::unlinkAll()
+{
+	for (auto& input : inputs)
+		input->unLinkWire(this);
+}
+
 void WireGroup::merge(WireGroup&& another)
 {
 	wireTiles.merge(another.wireTiles);
 	outputs.insert(outputs.end(), another.outputs.begin(), another.outputs.end());
+	inputs.insert(inputs.end(), another.inputs.begin(), another.inputs.end());
 	state |= another.state;
 }
 
@@ -39,6 +45,16 @@ WireGroup& WireGroup::operator=(const WireGroup& another)
 {
 	wireTiles = another.wireTiles;
 	outputs = another.outputs;
+	inputs = another.inputs;
+	state = another.state;
+	return *this;
+}
+
+WireGroup& WireGroup::operator=(const WireGroup&& another)
+{
+	wireTiles = std::move(another.wireTiles);
+	outputs = std::move(another.outputs);
+	inputs = std::move(another.inputs);
 	state = another.state;
 	return *this;
 }
