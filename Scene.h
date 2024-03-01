@@ -22,11 +22,17 @@ class Scene
 	bool tileEmpty(cvr pos)const;
 	void deleteWireGroup(int index);
 	//void deleteGate(Gate* gate);
-	std::pair<Gate*, bool> doesNewWireConnectToGate(cvr pos, Tile::Side side, Tile::Type type);
+	std::pair<Gate*, bool> doesNewWireConnectToGate(cvr pos, Tile::Side side);
 	bool doesNewWireConnectToWire(cvr pos, const WireGroup& wg, Tile::Side side);
 	Tile::Type doesNewGateConnectToWire(cvr pos, const WireGroup& wg, Tile::Side side);
+
+	void wireToGate(cvr pos, Tile::Side side, Tile::Type type);
+	void wireToWire(cvr pos, Tile::Type type);
+	void gateToWire(cvr pos, Tile::Side side);
 	v ptc(cvr pixels)const;
 	v ctp(cvr coords)const;
+
+	void debug()const;
 public:
 	Scene();
 	~Scene();
@@ -34,7 +40,6 @@ public:
 	void placeWire(cvr pos, Tile::Type type);
 	void placeGate(cvr pos, Tile::Type type);
 	void placeCross(cvr pos);
-	void placeSwitch(cvr pos);
 
 	void print();
 	void eventLoop();

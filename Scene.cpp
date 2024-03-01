@@ -26,14 +26,14 @@ void Scene::deleteWireGroup(int index)
 	wireGroups.erase(wireGroups.begin() + index);
 }
 
-std::pair<Gate*, bool> Scene::doesNewWireConnectToGate(cvr pos, Tile::Side side, Tile::Type type)
+std::pair<Gate*, bool> Scene::doesNewWireConnectToGate(cvr pos, Tile::Side side)
 {
 	// true or false in return value describes if connection is made through CROSS tiles
 	auto tempPos = Tile::neighbour(pos, side);
 
 	// first, check if input immediately connects to a gate
 	if (gates.contains(tempPos))
-		return std::make_pair(&gates[tempPos], true); // return immediate cconnection
+		return std::make_pair(&gates[tempPos], true); // return immediate connection
 
 	while (crosses.contains(tempPos)) //skipping all crosses in specified direction
 		tempPos = Tile::neighbour(tempPos, side);
@@ -72,6 +72,81 @@ Tile::Type Scene::doesNewGateConnectToWire(cvr pos, const WireGroup& wg, Tile::S
 	return Tile::VOID;
 }
 
+void Scene::wireToGate(cvr wirePos, Tile::Side side, Tile::Type type)
+{
+	WireGroup* wireGroup = nullptr;
+	for (auto& wg : wireGroups)
+		if (wg.wireTiles.contains(wirePos))
+		{
+			wireGroup = &wg;
+			break;
+		}
+	if (wireGroup == nullptr)
+		return;
+	if (auto gateAndMode = doesNewWireConnectToGate(wirePos, side); gateAndMode.first != nullptr)
+	{
+		// SWITCH has no inputs and outputs to all WIRE variations
+		// INPUT is considered a WIRE (output) for a gate if is separated by a CROSS
+		if (type == Tile::INPUT && gateAndMode.second && gateAndMode.first->type != Tile::SWITCH)
+			wireGroup->linkGate(gateAndMode.first);
+		else
+			gateAndMode.first->linkWire(wireGroup);
+	}
+}
+
+void Scene::wireToWire(cvr pos, Tile::Type type)
+{
+	// make sure new wire is in a group
+	bool groupFound = false;
+	int resultWireGroup = -1; // all groups that need merging will be merged to this one
+	for (int i = 0; i < wireGroups.size(); i++)
+		for (auto side : Tile::directions)
+			if (doesNewWireConnectToWire(pos, wireGroups[i], side)) // if point can be added to group
+			{
+				if (resultWireGroup != -1 && resultWireGroup != i) // if we need to merge 2 groups
+				{
+					wireGroups[resultWireGroup].merge(std::move(wireGroups[i]));
+					wireGroups.erase(wireGroups.begin() + i);
+					i--;
+				}
+				else
+				{
+					groupFound = true;
+					// can be added (but only once) straight away since we add a wire that belongs there
+					wireGroups[i].wireTiles.emplace(pos, type);
+					resultWireGroup = i;
+				}
+			}
+	if (!groupFound) // if point was not connected to any group - create new group
+	{
+		resultWireGroup = wireGroups.size();
+		wireGroups.emplace_back(WireGroup(crosses, gates));
+		wireGroups.back().wireTiles.emplace(pos, type);
+	}
+}
+
+void Scene::gateToWire(cvr pos, Tile::Side side)
+{
+	for (auto& wg : wireGroups)
+		if (auto wireType = doesNewGateConnectToWire(pos, wg, side); wireType != Tile::VOID)
+		{
+			WireGroup* wireGroup = &wg;
+			Gate* gate = &gates[pos];
+			if(gate->type == Tile::SWITCH)
+				gate->linkWire(wireGroup);
+			else
+				switch (wireType)
+				{
+				case Tile::WIRE:
+					gate->linkWire(wireGroup);
+					break;
+				case Tile::INPUT:
+					wireGroup->linkGate(gate);
+					break;
+				}
+		}
+}
+
 v Scene::ptc(cvr pixels) const
 {
 	return pixels / squareSize;
@@ -80,6 +155,15 @@ v Scene::ptc(cvr pixels) const
 v Scene::ctp(cvr coords) const
 {
 	return sf::Vector2i(coords) * squareSize;
+}
+
+void Scene::debug() const
+{
+	system("cls");
+	for (auto& wg : wireGroups)
+		std::cout << "group " << unsigned int(&wg) << " i: " << wg.inputs.size() << " o: " << wg.outputs.size() << std::endl;
+	for (auto& g : gates)
+		std::cout << "gate " << unsigned int(&g) << " i: " << g.second.inputs.size() << " o: " << g.second.outputs.size() << std::endl;
 }
 
 Scene::Scene()
@@ -113,43 +197,14 @@ void Scene::placeWire(cvr pos, Tile::Type type)
 {
 	if (!tileEmpty(pos))
 		return;
-	// make sure new wire is in a group
-	bool groupFound = false;
-	int resultWireGroup = -1; // all groups that need merging will be merged to this one
-	for (auto side : Tile::directions)
-		for(int i = 0; i < wireGroups.size(); i++)
-			if (doesNewWireConnectToWire(pos, wireGroups[i], side)) // if point can be added to group
-			{
-				if (resultWireGroup != -1) // if we need to merge 2 groups
-				{
-					wireGroups[resultWireGroup].merge(std::move(wireGroups[i]));
-					wireGroups.erase(wireGroups.begin() + i);
-					i--;
-				}
-				else
-				{
-					groupFound = true;
-					// can be added (but only once) straight away since we add a wire that belongs there
-					wireGroups[i].wireTiles.emplace(pos, type);
-					resultWireGroup = i;
-				}
-			}
-	if (!groupFound) // if point was not connected to any group - create new group
-	{
-		resultWireGroup = wireGroups.size();
-		wireGroups.emplace_back(WireGroup(crosses, gates));
-		wireGroups.back().wireTiles.emplace(pos, type);
-	}
+
+	// make sure wire is assigned to a group
+	wireToWire(pos, type);
 	// connections to gates may occur
 	for (auto side : Tile::directions)
-		if (auto gateAndMode = doesNewWireConnectToGate(pos, side, type); gateAndMode.first != nullptr)
-		{
-			WireGroup* wireGroup = &wireGroups[resultWireGroup];
-			if(type == Tile::INPUT && gateAndMode.second) // is INPUT connected to GATE with no CROSS inbetween or just any other case
-				wireGroup->linkGate(gateAndMode.first);
-			else
-				gateAndMode.first->linkWire(wireGroup);
-		}
+		wireToGate(pos, side, type);
+
+	debug();
 }
 
 void Scene::placeGate(cvr pos, Tile::Type type)
@@ -160,21 +215,9 @@ void Scene::placeGate(cvr pos, Tile::Type type)
 	gates.emplace(pos, Gate(type));
 	// connections to wires may occur
 	for (auto side : Tile::directions)
-		for(auto& wg: wireGroups)
-			if (auto wireType = doesNewGateConnectToWire(pos, wg, side); wireType != Tile::VOID)
-			{
-				WireGroup* wireGroup = &wg;
-				Gate* gate = &gates[pos];
-				switch (wireType)
-				{
-				case Tile::WIRE:
-					gate->linkWire(wireGroup);
-					break;
-				case Tile::INPUT:
-					wireGroup->linkGate(gate);
-					break;
-				}
-			}
+		gateToWire(pos, side);
+
+	debug();
 }
 
 void Scene::placeCross(cvr pos)
@@ -183,11 +226,6 @@ void Scene::placeCross(cvr pos)
 		return;
 
 	crosses.insert(pos);
-}
-
-void Scene::placeSwitch(cvr pos)
-{
-
 }
 
 void Scene::print()
@@ -282,6 +320,7 @@ void Scene::eventLoop()
 					case Tile::NAND:
 					case Tile::XOR:
 					case Tile::XNOR:
+					case Tile::SWITCH:
 						placeGate(ptc(sf::Mouse::getPosition(window)), Tile::tiles[selectedTile]);
 						break;
 					case Tile::WIRE:
@@ -290,9 +329,6 @@ void Scene::eventLoop()
 						break;
 					case Tile::CROSS:
 						placeCross(ptc(sf::Mouse::getPosition(window)));
-						break;
-					case Tile::SWITCH:
-						placeSwitch(ptc(sf::Mouse::getPosition(window)));
 						break;
 					default: abort();
 					}
