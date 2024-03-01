@@ -91,9 +91,10 @@ v Scene::ctp(cvr coords) const
 
 Scene::Scene()
 {
-	{
 		window.create(sf::VideoMode(800, 800), "");
-	}
+	window.setFramerateLimit(fps);
+	window.setVerticalSyncEnabled(true);
+
 	textures.assign(Tile::tiles.size(), sf::Texture());
 	for (int i = 0; i < Tile::tiles.size(); i++)
 	{
@@ -205,49 +206,61 @@ void Scene::placeSwitch(cvr pos)
 
 void Scene::print()
 {
-	const float scale = 1;// float(squareSize) / textureSize;
 	window.clear();
-	sf::RectangleShape r(sf::Vector2f(32, 32));
+	sf::RectangleShape r(sf::Vector2f(squareSize - 1, squareSize - 1));
 
 	auto stateColor = [this](bool state)
 		{
 			return state ? sf::Color::White : sf::Color(64, 64, 64);
 		};
-	// select panel
-	for (int i = 0; i < textures.size(); i++)
+	auto visible = [this](cvr pos)
 	{
-		r.setTexture(&textures[i]);
-		r.setPosition(0, i * 36);
-		r.setFillColor(stateColor(selectedTile == Tile::tiles[i]));
-		window.draw(r);
-	}
+			return pos.x >= -squareSize && pos.y >= -squareSize && pos.x < viewport && pos.y < viewport;
+		};
 	// wires
-	r.setSize(v(squareSize, squareSize));
-	r.setScale(scale, scale);
-	for (auto& wg : wireGroups)
+	for (const auto& wg : wireGroups)
 	{
 		r.setFillColor(stateColor(wg.outputs.size() > 0)); // wg.state
 		for (auto& wireTile : wg.wireTiles)
 		{
+			if (visible(ctp(wireTile.first)))
+			{
 			r.setPosition(ctp(wireTile.first));
 			r.setTexture(&textures[static_cast<int>(wireTile.second)]);
 			window.draw(r);
 		}
 	}
+	}
 	// gates
-	for (auto& gate : gates)
+	for (const auto& gate : gates)
+	{
+		if (visible(ctp(gate.first)))
 	{
 		r.setPosition(ctp(gate.first));
 		r.setFillColor(stateColor(gate.second.outputs.size() > 0)); // gate.second.state
 		r.setTexture(&textures[static_cast<int>(gate.second.type)]);
 		window.draw(r);
 	}
+	}
 	// crosses
 	r.setFillColor(sf::Color::White);
-	for (auto& cross : crosses)
+	for (const auto& cross : crosses)
+	{
+		if (visible(ctp(cross)))
 	{
 		r.setPosition(ctp(cross));
 		r.setTexture(&textures[Tile::CROSS]);
+		window.draw(r);
+	}
+	}
+	// lastly, the selection panel
+	r.setSize(v(32, 32));
+	r.setOutlineThickness(1);
+	for (int i = 0; i < textures.size(); i++)
+	{
+		r.setTexture(&textures[i]);
+		r.setPosition(4, 4 + i * 36);
+		r.setFillColor(stateColor(selectedTile == Tile::tiles[i]));
 		window.draw(r);
 	}
 	
@@ -259,7 +272,6 @@ void Scene::eventLoop()
 	sf::Event e;
 	clock_t lastFrame = clock();
 
-	window.setFramerateLimit(fps);
 	while (window.isOpen())
 	{
 		while (window.pollEvent(e))

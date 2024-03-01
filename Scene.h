@@ -10,7 +10,7 @@
 class Scene
 {
 	const int viewport = 800, fps = 60, textureSize = 32;
-	int squareSize = 64;
+	int squareSize = 5;
 	sf::RenderWindow window;
 	std::vector<sf::Texture> textures;
 
