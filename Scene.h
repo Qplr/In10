@@ -26,8 +26,8 @@ class Scene
 	bool doesNewWireConnectToWire(cvr pos, const WireGroup& wg, Tile::Side side);
 	Tile::Type doesNewGateConnectToWire(cvr pos, const WireGroup& wg, Tile::Side side);
 
-	void wireToGate(cvr pos, Tile::Side side, Tile::Type type);
-	void wireToWire(cvr pos, Tile::Type type);
+	void wireToGate(cvr pos, Tile::Side side, Tile::Type type, WireGroup* wireGroup);
+	int wireToWire(cvr pos, Tile::Type type, const std::vector<Tile::Side> directions);
 	void gateToWire(cvr pos, Tile::Side side);
 	v ptc(cvr pixels)const;
 	v ctp(cvr coords)const;

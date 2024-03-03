@@ -72,9 +72,10 @@ Tile::Type Scene::doesNewGateConnectToWire(cvr pos, const WireGroup& wg, Tile::S
 	return Tile::VOID;
 }
 
-void Scene::wireToGate(cvr wirePos, Tile::Side side, Tile::Type type)
+void Scene::wireToGate(cvr wirePos, Tile::Side side, Tile::Type type, WireGroup* wireGroup = nullptr)
 {
-	WireGroup* wireGroup = nullptr;
+	if (wireGroup == nullptr)
+{
 	for (auto& wg : wireGroups)
 		if (wg.wireTiles.contains(wirePos))
 		{
@@ -83,6 +84,7 @@ void Scene::wireToGate(cvr wirePos, Tile::Side side, Tile::Type type)
 		}
 	if (wireGroup == nullptr)
 		return;
+	}
 	if (auto gateAndMode = doesNewWireConnectToGate(wirePos, side); gateAndMode.first != nullptr)
 	{
 		// SWITCH has no inputs and outputs to all WIRE variations
@@ -94,13 +96,13 @@ void Scene::wireToGate(cvr wirePos, Tile::Side side, Tile::Type type)
 	}
 }
 
-void Scene::wireToWire(cvr pos, Tile::Type type)
+int Scene::wireToWire(cvr pos, Tile::Type type, const std::vector<Tile::Side> directions = Tile::directions)
 {
 	// make sure new wire is in a group
 	bool groupFound = false;
 	int resultWireGroup = -1; // all groups that need merging will be merged to this one
 	for (int i = 0; i < wireGroups.size(); i++)
-		for (auto side : Tile::directions)
+		for (auto side : directions)
 			if (doesNewWireConnectToWire(pos, wireGroups[i], side)) // if point can be added to group
 			{
 				if (resultWireGroup != -1 && resultWireGroup != i) // if we need to merge 2 groups
@@ -112,17 +114,18 @@ void Scene::wireToWire(cvr pos, Tile::Type type)
 				else
 				{
 					groupFound = true;
-					// can be added (but only once) straight away since we add a wire that belongs there
+					if (type != Tile::CROSS)
 					wireGroups[i].wireTiles.emplace(pos, type);
 					resultWireGroup = i;
 				}
 			}
-	if (!groupFound) // if point was not connected to any group - create new group
+	if (!groupFound && type != Tile::CROSS) // if point was not connected to any group - create new group
 	{
 		resultWireGroup = wireGroups.size();
 		wireGroups.emplace_back(WireGroup(crosses, gates));
 		wireGroups.back().wireTiles.emplace(pos, type);
 	}
+	return resultWireGroup;
 }
 
 void Scene::gateToWire(cvr pos, Tile::Side side)
@@ -199,10 +202,11 @@ void Scene::placeWire(cvr pos, Tile::Type type)
 		return;
 
 	// make sure wire is assigned to a group
-	wireToWire(pos, type);
+	int wg = wireToWire(pos, type);
 	// connections to gates may occur
+	if(wg != -1)
 	for (auto side : Tile::directions)
-		wireToGate(pos, side, type);
+			wireToGate(pos, side, type, &wireGroups[wg]);
 
 	debug();
 }
@@ -225,7 +229,16 @@ void Scene::placeCross(cvr pos)
 	if (!tileEmpty(pos))
 		return;
 
-	crosses.insert(pos);
+	crosses.emplace(pos);
+	// connections to gates may occur
+	if (int wg = wireToWire(pos, Tile::CROSS, {Tile::N, Tile::S}); wg != -1)
+		for (auto side : { Tile::N, Tile::S })
+			wireToGate(pos, side, Tile::WIRE, &wireGroups[wg]);
+	if (int wg = wireToWire(pos, Tile::CROSS, { Tile::W, Tile::E }); wg != -1)
+		for (auto side : { Tile::W, Tile::E })
+			wireToGate(pos, side, Tile::WIRE, &wireGroups[wg]);
+
+	debug();
 }
 
 void Scene::print()
