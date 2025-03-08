@@ -1,29 +1,20 @@
 #include "Gate.h"
 #include "WireGroup.h"
 
-Gate::Gate(Type type): type(type)
+Gate::Gate(Gate&& another):
+	Tile(another.type())
 {
-
+	_state = another.state(); // copy state
+	pos = another.pos; // copy pos
+	_type = another.type(); // copy type
+	for (auto input : another.inputs()) // inherit inputs from another
+		input->addOutput(this);
+	for (auto output : another.outputs()) // inherit outputs from another
+		output->addInput(this);
+	another.unlinkAll(); // make sure that another is no longer referenced
 }
 
-void Gate::linkWire(WireGroup* wg)
+Gate::Gate(v pos, Type type): Tile(type), pos(pos)
 {
-	outputs.push_back(wg);
-	wg->inputs.push_back(this);
-}
 
-void Gate::unLinkWire(WireGroup* wg)
-{
-	for (int i = 0; i < outputs.size(); i++)
-		if (wg == outputs[i])
-			outputs.erase(outputs.begin() + i);
-	for (int i = 0; i < wg->inputs.size(); i++)
-		if (wg->inputs[i] == this)
-			wg->inputs.erase(wg->inputs.begin() + i);
-}
-
-void Gate::unlinkAll()
-{
-	for (auto& input : inputs)
-		input->unLinkGate(this);
 }

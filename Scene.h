@@ -9,26 +9,26 @@
 
 class Scene
 {
-	const int viewport = 800, fps = 60, textureSize = 32;
-	int squareSize = 5;
+	const int viewport = 800, fps = 60, tps = 5, textureSize = 32;
+	int squareSize = 25;
 	sf::RenderWindow window;
 	std::vector<sf::Texture> textures;
 
-	std::vector<WireGroup> wireGroups;
-	std::map<v, Gate> gates;
+	std::vector<WireGroup*> wireGroups;
+	std::vector<Gate*> gates;
 	std::set<v> crosses;
 	int selectedTile = 0;
 
-	bool tileEmpty(cvr pos)const;
-	void deleteWireGroup(int index);
-	//void deleteGate(Gate* gate);
-	std::pair<Gate*, bool> doesNewWireConnectToGate(cvr pos, Tile::Side side);
-	bool doesNewWireConnectToWire(cvr pos, const WireGroup& wg, Tile::Side side);
-	Tile::Type doesNewGateConnectToWire(cvr pos, const WireGroup& wg, Tile::Side side);
+	std::set<Tile*> updatedGates;
+	std::set<Tile*> updatedWires;
 
-	void wireToGate(cvr pos, Tile::Side side, Tile::Type type, WireGroup* wireGroup);
-	int wireToWire(cvr pos, Tile::Type type, const std::vector<Tile::Side> directions);
-	void gateToWire(cvr pos, Tile::Side side);
+	bool tileEmpty(cvr pos)const;
+	std::pair<v, int> sideConnectsToWire(v pos, Tile::Side side);
+	std::pair<v, int> sideConnectsToGate(v pos, Tile::Side side);
+	int wireAt(cvr pos);
+	int gateAt(cvr pos);
+	void connectIfPossible(WireGroup* wg, v pos, Tile::Side direction);
+
 	v ptc(cvr pixels)const;
 	v ctp(cvr coords)const;
 
@@ -37,11 +37,14 @@ public:
 	Scene();
 	~Scene();
 
+	void leftClick(cvr pos);
+	void rightClick(cvr pos);
 	void placeWire(cvr pos, Tile::Type type);
 	void placeGate(cvr pos, Tile::Type type);
 	void placeCross(cvr pos);
 
 	void print();
+	void tick();
 	void eventLoop();
 };
 

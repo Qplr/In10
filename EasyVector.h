@@ -12,5 +12,8 @@ public:
 	EasyVector() {}
 	EasyVector(int x, int y) : sf::Vector2i(x, y) {}
 	EasyVector(const sf::Vector2i& vec) : sf::Vector2i(vec) {}
+
+	inline int x_plus_y() const { return x + y; }
+	friend inline EasyVector operator-(const EasyVector& first, const EasyVector& second);
 };
 

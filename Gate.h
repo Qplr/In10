@@ -4,20 +4,19 @@
 
 #include "defines.h"
 #include "Tile.h"
+#include "Orientation.h"
 
 class WireGroup;
 
 class Gate: public Tile
 {
-	bool state = false;
-	Type type = VOID;
-	std::vector<WireGroup*> outputs, inputs;
+	v pos;
+	Orientation orientation;
 public:
-	Gate() {}
-	Gate(Type type);
-	void linkWire(WireGroup* wg);
-	void unLinkWire(WireGroup* wg);
-	void unlinkAll();
+	Gate(Gate&& another);
+	Gate(const Gate& another) = delete;
+	Gate(v pos, Type type);
+
 	friend class Scene;
 	friend class WireGroup;
 };

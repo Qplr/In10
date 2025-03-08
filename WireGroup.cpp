@@ -1,60 +1,44 @@
 #include "WireGroup.h"
 #include "Gate.h"
 
-WireGroup::WireGroup(const WireGroup&& another) : crosses(another.crosses)
+WireGroup::WireGroup(v pos, Tile::Type type)
+	:Tile(Tile::VOID)
 {
-	*this = another;
+	wireTiles.insert({ pos, type });
+	min = pos;
+	max = pos;
 }
 
-WireGroup::WireGroup(const WireGroup& another) : crosses(another.crosses)
+WireGroup::WireGroup(WireGroup&& another)
+	:Tile(Tile::VOID)
 {
-	*this = another;
-}
-
-void WireGroup::linkGate(Gate* gate)
-{
-	outputs.push_back(gate);
-	gate->inputs.push_back(this);
-}
-
-void WireGroup::unLinkGate(Gate* gate)
-{
-	for (int i = 0; i < outputs.size(); i++)
-		if (gate == outputs[i])
-			outputs.erase(outputs.begin() + i);
-	for (int i = 0; i < gate->inputs.size(); i++)
-		if (gate->inputs[i] == this)
-			gate->inputs.erase(gate->inputs.begin() + i);
-}
-
-void WireGroup::unlinkAll()
-{
-	for (auto& input : inputs)
-		input->unLinkWire(this);
+	_state = another.state(); // copy state
+	wireTiles = std::move(another.wireTiles);
+	tileOrientations = std::move(another.tileOrientations);
+	for (auto input : another.inputs()) // inherit inputs from another
+		input->addOutput(this);
+	for (auto output : another.outputs()) // inherit outputs from another
+		output->addInput(this);
+	another.unlinkAll(); // make sure that another is no longer referenced
 }
 
 void WireGroup::merge(WireGroup&& another)
 {
-	wireTiles.merge(another.wireTiles);
-	outputs.insert(outputs.end(), another.outputs.begin(), another.outputs.end());
-	inputs.insert(inputs.end(), another.inputs.begin(), another.inputs.end());
-	state |= another.state;
+	_state |= another.state();
+	wireTiles.merge(std::move(another.wireTiles)); // merge tiles
+
+	tileOrientations.merge(std::move(another.tileOrientations));
+
+	for (auto output : another.outputs()) // inherit outputs from another
+	{
+		addOutput(output);
+		output->addInput(this);
+	}
+	for (auto input : another.inputs()) // inherit inputs from another
+	{
+		addInput(input);
+		input->addOutput(this);
+	}
+	another.unlinkAll(); // make sure that another is no longer referenced
 }
 
-WireGroup& WireGroup::operator=(const WireGroup& another)
-{
-	wireTiles = another.wireTiles;
-	outputs = another.outputs;
-	inputs = another.inputs;
-	state = another.state;
-	return *this;
-}
-
-WireGroup& WireGroup::operator=(const WireGroup&& another)
-{
-	wireTiles = std::move(another.wireTiles);
-	outputs = std::move(another.outputs);
-	inputs = std::move(another.inputs);
-	state = another.state;
-	return *this;
-}
