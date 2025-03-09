@@ -9,22 +9,20 @@
 
 class Scene
 {
-	const int viewport = 800, fps = 60, tps = 10, textureSize = 32;
-	int squareSize = 25;
-	sf::RenderWindow window;
-	std::vector<sf::Texture> textures;
-
-	std::vector<WireGroup*> wireGroups;
-	std::vector<Gate*> gates;
+	std::vector<WireGroup*> _wireGroups;
+	std::vector<Gate*> _gates;
+	std::set<v> _crosses;
 
 	void deleteWireGroup(int index);
 	void deleteGate(int index);
 
-	std::set<v> crosses;
-	int selectedTile = 0;
+	int _selectedTileId = 0;
+	Tile::Type _selectedTile = Tile::tiles[_selectedTileId];
 
+	int tps = 10;
 	std::set<Tile*> updatedGates;
 	std::set<Tile*> updatedWires;
+	clock_t lastTick = clock();
 
 	Tile::Type tileType(cvr pos)const;
 	std::pair<v, Tile*> sideConnectsToSpecificTileOf(v pos, Tile::Side side, const std::vector<Tile*>& wg);
@@ -35,9 +33,6 @@ class Scene
 	void connectIfPossible(WireGroup* wg, v pos, Tile::Side direction);
 	WireGroup* isolateIfPossible(WireGroup* wg, v pos, Tile::Side side);
 
-	v ptc(cvr pixels)const;
-	v ctp(cvr coords)const;
-
 #ifdef _DEBUG
 	void debug()const;
 #endif
@@ -45,8 +40,14 @@ public:
 	Scene();
 	~Scene();
 
+	const std::set<v>& crosses() const { return _crosses; }
+	const std::vector<WireGroup*> wireGroups() const { return _wireGroups; }
+	const std::vector<Gate*> gates() const { return _gates; }
+
 	void leftClick(cvr pos);
 	void rightClick(cvr pos);
+	void scrollSelectedTile(int delta) { _selectedTileId = (_selectedTileId - delta + Tile::tiles.size()) % Tile::tiles.size(); _selectedTile = Tile::tiles[_selectedTileId]; }
+	Tile::Type selectedTile() const { return _selectedTile; }
 
 	void placeWire(cvr pos, Tile::Type type);
 	void placeGate(cvr pos, Tile::Type type);
@@ -55,9 +56,7 @@ public:
 	void removeWire(cvr pos);
 	void removeGate(cvr pos);
 	void removeCross(cvr pos);
-
-	void print();
+	
 	void tick();
-	void eventLoop();
 };
 

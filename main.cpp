@@ -1,11 +1,11 @@
- #include "Scene.h"
+ #include "Application.h"
 		
 #include <iostream>
 using namespace std;
 
 int main()
 {
-	Scene s;
-	s.eventLoop();
+	Application app;
+	app.eventLoop();
 	return 0;
 }

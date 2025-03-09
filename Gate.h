@@ -19,8 +19,5 @@ public:
 	v pos() const { return _pos; }
 	virtual Orientation& orientation(cvr pos = EasyVector()) override { return _orientation; };
 	virtual bool contains(cvr pos) const { return pos == _pos; }
-
-	friend class Scene;
-	friend class WireGroup;
 };
 
