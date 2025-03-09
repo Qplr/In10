@@ -3,21 +3,57 @@
 #include <format>
 #include <numeric>
 #include <time.h>
+#include <stack>
 
-//	debug
+#ifdef _DEBUG
 #include <iostream>
-//	\debug
+#endif // _DEBUG
 
-bool Scene::tileEmpty(cvr pos) const
+void Scene::deleteWireGroup(int index)
 {
-	if (std::find_if(gates.begin(), gates.end(), [pos](Gate* gate) { return gate->pos == pos; }) != gates.end())
-		return false;
+#ifdef _DEBUG
+	if (updatedWires.erase(wireGroups[index]))
+		std::cout << "removed updated wire" << std::endl;
+#else
+	updatedWires.erase(wireGroups[index]);
+#endif
+	delete wireGroups[index];
+	wireGroups.erase(wireGroups.begin() + index);
+}
+
+void Scene::deleteGate(int index)
+{
+#ifdef _DEBUG
+	if (updatedGates.erase(gates[index]))
+		std::cout << "removed updated gate" << std::endl;
+#else
+	updatedGates.erase(gates[index]);
+#endif
+	delete gates[index];
+	gates.erase(gates.begin() + index);
+}
+
+Tile::Type Scene::tileType(cvr pos) const
+{
+	if (auto it = std::find_if(gates.begin(), gates.end(), [pos](Gate* gate) { return gate->pos() == pos; });  it != gates.end())
+		return (*it)->type();
 	if (crosses.contains(pos))
-		return false;
+		return Tile::CROSS;
 	for (auto wg : wireGroups)
 		if (wg->wireTiles.contains(pos))
-			return false;
-	return true;
+			return wg->wireTiles[pos];
+	return Tile::VOID;
+}
+
+std::pair<v, Tile*> Scene::sideConnectsToSpecificTileOf(v pos, Tile::Side side, const std::vector<Tile*>& g)
+{
+	do
+		pos = Tile::neighbour(pos, side);
+	while (crosses.contains(pos));
+	for (int i = 0; i < g.size(); i++)
+		if (g[i]->contains(pos))
+			return std::make_pair(pos, g[i]);
+	return { pos, nullptr };
 }
 
 std::pair<v, int> Scene::sideConnectsToWire(v pos, Tile::Side side)
@@ -47,7 +83,7 @@ int Scene::wireAt(cvr pos)
 int Scene::gateAt(cvr pos)
 {
 	for (int i = 0; i < gates.size(); i++)
-		if(gates[i]->pos == pos)
+		if(gates[i]->pos() == pos)
 			return i;
 	return -1;
 }
@@ -63,8 +99,7 @@ void Scene::connectIfPossible(WireGroup* wg, v pos, Tile::Side direction)
 		if (wireGroups[wireGroupIndex] != wg)
 		{
 			wg->merge(std::move(*wireGroups[wireGroupIndex])); // merge 2 groups
-			delete wireGroups[wireGroupIndex]; // free WireGroup object
-			wireGroups.erase(wireGroups.begin() + wireGroupIndex); // remove merged from list
+			deleteWireGroup(wireGroupIndex);
 		}
 
 		wg->tileOrientations[pos].setConnection(direction);
@@ -79,7 +114,7 @@ void Scene::connectIfPossible(WireGroup* wg, v pos, Tile::Side direction)
 			wg->addInput(gates[gateIndex]);
 
 			wg->tileOrientations[pos].setInputFrom(direction);
-			gates[gateIndex]->orientation.setOutputTo(Tile::reverse(direction));
+			gates[gateIndex]->orientation().setOutputTo(Tile::reverse(direction));
 		}
 		else if (wg->wireTiles[pos] == Tile::INPUT) // other gates as receivers if type is INPUT
 		{
@@ -87,9 +122,81 @@ void Scene::connectIfPossible(WireGroup* wg, v pos, Tile::Side direction)
 			wg->addOutput(gates[gateIndex]);
 
 			wg->tileOrientations[pos].setOutputTo(direction);
-			gates[gateIndex]->orientation.setInputFrom(Tile::reverse(direction));
+			gates[gateIndex]->orientation().setInputFrom(Tile::reverse(direction));
 		}
 	}
+}
+
+WireGroup* Scene::isolateIfPossible(WireGroup* wg, v pos, Tile::Side side)
+{
+	std::vector<std::pair<v, Tile::Type>> isolatedTiles; // only affected tiles. their orientations will remain in wg.tileOrientations
+	std::vector<int> isolatedInputs; // gates index
+	std::vector<int> isolatedOutputs; // gates index
+	std::stack<std::pair<v, Tile::Side>> toStepTiles; // tile to visit and an origin direction
+
+	if (auto wirePosAndIndex = sideConnectsToWire(pos, side); wirePosAndIndex.second != -1)
+	{
+		v stepPos = wirePosAndIndex.first; // make a wire to this side a first step
+		Tile::Side origin = Tile::reverse(side); // set origin
+		
+		toStepTiles.push(std::make_pair(stepPos, origin)); // first step
+
+		// collect isolated tiles
+		while (!toStepTiles.empty())
+		{
+			stepPos = toStepTiles.top().first;
+			origin = toStepTiles.top().second;
+			toStepTiles.pop();
+
+			isolatedTiles.push_back(std::make_pair(stepPos, wg->wireTiles[stepPos])); //save tile
+			wg->wireTiles.erase(stepPos); // delete from original wire group (also to protect from loops)
+
+			// TODO pass <wg> to <sideConnectsToWire>, <outputs> and <inputs> to <sideConnectsToGate> to reduce search
+			// as we dont really need their indexes to reconnect
+			for (auto direction : Tile::directions)
+			{
+				if (direction == origin) // don't look back
+					continue;
+				bool inputFrom = wg->tileOrientations[stepPos].hasInputFrom(direction); // do we have input from direction
+				bool outputTo = wg->tileOrientations[stepPos].hasOutputTo(direction); // do we have an output to direction
+				if (inputFrom && !outputTo) // only input from direction (from gate)
+					isolatedInputs.push_back(sideConnectsToGate(stepPos, direction).second);
+				else if (!inputFrom && outputTo) // only output to direction (to gate)
+					isolatedOutputs.push_back(sideConnectsToGate(stepPos, direction).second);
+				else if (inputFrom && outputTo) // both input and output (wire)
+				{
+					if (auto wirePosAndIndex = sideConnectsToWire(stepPos, direction); wirePosAndIndex.second != -1) // check if there is actually a wire or we did this step already
+						toStepTiles.push(std::make_pair( // next step
+							wirePosAndIndex.first,
+							Tile::reverse(direction)));
+				}
+			}
+		}
+		// create new WireGroup
+		auto newWireGroup = new WireGroup(isolatedTiles);
+		for (auto pos : isolatedTiles)
+			newWireGroup->tileOrientations.insert(std::make_pair(pos.first, wg->tileOrientations.at(pos.first)));
+		for (int input : isolatedInputs)
+		{
+			newWireGroup->addInput(gates[input]);
+			gates[input]->addOutput(newWireGroup);
+			gates[input]->removeOutput(wg);
+		}
+		for (int output : isolatedOutputs)
+		{
+			newWireGroup->addOutput(gates[output]);
+			gates[output]->addInput(newWireGroup);
+			gates[output]->removeInput(wg);
+		}
+		return newWireGroup;
+	}
+	else if (auto gatePosAndIndex = sideConnectsToGate(pos, side); gatePosAndIndex.second != -1)
+	{
+		Gate* gate = gates[gatePosAndIndex.second];
+		gate->unlink(wg);
+		gate->orientation().unSetConnection(Tile::reverse(side));
+	}
+	return nullptr;
 }
 
 v Scene::ptc(cvr pixels) const
@@ -102,14 +209,22 @@ v Scene::ctp(cvr coords) const
 	return sf::Vector2i(coords) * squareSize;
 }
 
+#ifdef _DEBUG
 void Scene::debug() const
 {
-	system("cls");
 	for (auto wg : wireGroups)
-		std::cout << "group " << unsigned int(wg) << " i: " << wg->inputs().size() << " o: " << wg->outputs().size() << std::endl;
+		std::cout << "group " << unsigned(wg) << " i: " << wg->inputs().size() << " o: " << wg->outputs().size() << std::endl;
 	for (auto g : gates)
-		std::cout << "gate " << unsigned int(g) << " i: " << g->inputs().size() << " o: " << g->outputs().size() << std::endl;
+	{
+		std::cout << "gate " << unsigned(g) << " i: " << std::endl;
+		for (auto input : g->inputs())
+			std::cout << unsigned(input) << std::endl;
+		std::cout << " o: " << std::endl;
+		for (auto output : g->outputs())
+			std::cout << unsigned(output) << std::endl;
+	}
 }
+#endif
 
 Scene::Scene()
 {
@@ -144,6 +259,28 @@ Scene::~Scene()
 
 void Scene::leftClick(cvr pos)
 {
+	Tile::Type clickedTileType = tileType(pos);
+	switch (clickedTileType)
+	{
+	case Tile::OR:
+	case Tile::NOR:
+	case Tile::AND:
+	case Tile::NAND:
+	case Tile::XOR:
+	case Tile::XNOR:
+	case Tile::SWITCH:
+		removeGate(pos);
+		break;
+	case Tile::WIRE:
+	case Tile::INPUT:
+		removeWire(pos);
+		break;
+	case Tile::CROSS:
+		removeCross(pos);
+		break;
+	default:
+		break;
+	}
 }
 
 void Scene::rightClick(cvr pos)
@@ -175,7 +312,7 @@ void Scene::rightClick(cvr pos)
 
 void Scene::placeWire(cvr pos, Tile::Type type)
 {
-	if (!tileEmpty(pos))
+	if (tileType(pos) != Tile::VOID)
 		return;
 
 
@@ -185,12 +322,14 @@ void Scene::placeWire(cvr pos, Tile::Type type)
 	for (auto direction : Tile::directions) // for every direction
 		connectIfPossible(newWireGroup, pos, direction);
 
+#ifdef _DEBUG
 	debug();
+#endif
 }
 
 void Scene::placeGate(cvr pos, Tile::Type type)
 {
-	if (!tileEmpty(pos))
+	if (tileType(pos) != Tile::VOID)
 		return;
 
 	auto newGate = new Gate(pos, type);
@@ -205,16 +344,16 @@ void Scene::placeGate(cvr pos, Tile::Type type)
 				newGate->addOutput(wireGroup);
 				wireGroup->addInput(newGate);
 
-				wireGroup->tileOrientations[wirePosition].setInputFrom(Tile::reverse(direction));
-				newGate->orientation.setOutputTo(direction);
+				wireGroup->orientation(wirePosition).setInputFrom(Tile::reverse(direction));
+				newGate->orientation().setOutputTo(direction);
 			}
 			else
 			{
 				newGate->addInput(wireGroup);
 				wireGroup->addOutput(newGate);
 
-				wireGroup->tileOrientations[wirePosition].setOutputTo(Tile::reverse(direction));
-				newGate->orientation.setInputFrom(direction);
+				wireGroup->orientation(wirePosition).setOutputTo(Tile::reverse(direction));
+				newGate->orientation().setInputFrom(direction);
 			}
 		}
 	gates.push_back(newGate);
@@ -222,12 +361,14 @@ void Scene::placeGate(cvr pos, Tile::Type type)
 	if (type != Tile::SWITCH)
 		updatedGates.insert(newGate);
 
+#ifdef _DEBUG
 	debug();
+#endif
 }
 
 void Scene::placeCross(cvr pos)
 {
-	if (!tileEmpty(pos))
+	if (tileType(pos) != Tile::VOID)
 		return;
 
 	crosses.insert(pos);
@@ -239,15 +380,145 @@ void Scene::placeCross(cvr pos)
 		if (auto wirePosAndIndex = sideConnectsToWire(pos, direction); wirePosAndIndex.second != -1)
 			connectIfPossible(wireGroups[wirePosAndIndex.second], wirePosAndIndex.first, Tile::reverse(direction));
 
+#ifdef _DEBUG
 	debug();
+#endif
+}
+
+void Scene::removeWire(cvr pos)
+{
+	int wgIndex = wireAt(pos);
+	WireGroup* wg = wireGroups[wgIndex];
+
+	std::vector<WireGroup*> newWireGroups;
+
+	// remove tile from group
+	wg->wireTiles.erase(pos);
+	wg->tileOrientations.erase(pos);
+
+	// remove adjacent tiles orientations towards deleted tile
+	// those tiles can only either be wires from same group or a gate from inputs or outputs
+	for (auto direction : Tile::directions)
+	{
+		if (auto wirePosAndPtr = sideConnectsToSpecificTileOf(pos, direction, { wg }); wirePosAndPtr.second != nullptr)
+			wg->tileOrientations[wirePosAndPtr.first].unSetConnection(Tile::reverse(direction));
+		else if (wg->wireTiles[pos] == Tile::WIRE)
+		{
+			if (auto gatePosAndPtr = sideConnectsToSpecificTileOf(pos, direction, wg->inputs()); gatePosAndPtr.second != nullptr)
+				gatePosAndPtr.second->orientation().unSetConnection(Tile::reverse(direction));
+		}
+		else if (wg->wireTiles[pos] == Tile::INPUT)
+		{
+			if (auto gatePosAndPtr = sideConnectsToSpecificTileOf(pos, direction, wg->outputs()); gatePosAndPtr.second != nullptr)
+				gatePosAndPtr.second->orientation().unSetConnection(Tile::reverse(direction));
+		}
+	}
+
+	for (auto direction : Tile::directions)
+	{
+		if (auto newWg = isolateIfPossible(wg, pos, direction); newWg != nullptr)
+			newWireGroups.push_back(newWg);
+	}
+	deleteWireGroup(wgIndex);
+	for (auto newWg : newWireGroups)
+		wireGroups.push_back(newWg);
+
+#ifdef _DEBUG
+	debug();
+#endif
+}
+
+void Scene::removeGate(cvr pos)
+{
+	int gateIndex = gateAt(pos);
+	Gate* gate = gates[gateIndex];
+
+	for (auto direction : Tile::directions)
+	{
+		Tile* wg;
+		v wirePos;
+		if (gate->orientation().hasInputFrom(direction))
+		{
+			if (auto tilePosAndPtr = sideConnectsToSpecificTileOf(pos, direction, gate->inputs()); tilePosAndPtr.second != nullptr)
+			{
+				wirePos = tilePosAndPtr.first;
+				wg = tilePosAndPtr.second;
+
+				wg->removeOutput(gate);
+
+				wg->orientation(wirePos).unSetConnection(Tile::reverse(direction));
+			}
+		}
+		else if (gate->orientation().hasOutputTo(direction))
+		{
+			if (auto tilePosAndPtr = sideConnectsToSpecificTileOf(pos, direction, gate->outputs()); tilePosAndPtr.second != nullptr)
+			{
+				wirePos = tilePosAndPtr.first;
+				wg = tilePosAndPtr.second;
+
+				wg->removeInput(gate);
+
+				wg->orientation(wirePos).unSetConnection(Tile::reverse(direction));
+			}
+		}
+	}
+	deleteGate(gateIndex);
+
+#ifdef _DEBUG
+	debug();
+#endif
+}
+
+void Scene::removeCross(cvr pos)
+{
+	std::vector<WireGroup*> newWireGroups;
+	
+	int verticalIndex = -1;
+	int horizontalIndex = -1;
+
+	auto isolate = [this, &pos, &newWireGroups](std::vector<Tile::Side> dirs, int wgIndex)
+		{
+			if (wgIndex == -1)
+				return;
+			for (auto direction : dirs)
+			{
+				if (auto newWg = isolateIfPossible(wireGroups[wgIndex], pos, direction); newWg != nullptr)
+					newWireGroups.push_back(newWg);
+			}
+			deleteWireGroup(wgIndex);
+		};
+
+	for (auto direction : { Tile::N, Tile::S })
+		if (auto wirePosAndIndex = sideConnectsToWire(pos, direction); wirePosAndIndex.second != -1)
+		{
+			isolate({ Tile::N, Tile::S }, wirePosAndIndex.second);
+			break;
+		}
+	for (auto direction : { Tile::W, Tile::E })
+		if (auto wirePosAndIndex = sideConnectsToWire(pos, direction); wirePosAndIndex.second != -1)
+		{
+			isolate({ Tile::W, Tile::E }, wirePosAndIndex.second);
+			break;
+		}
+
+	for (auto newWg : newWireGroups)
+		wireGroups.push_back(newWg);
+
+	crosses.erase(pos);
+
+#ifdef _DEBUG
+	debug();
+#endif
 }
 
 void Scene::print()
 {
 	window.clear();
 	sf::RectangleShape r(sf::Vector2f(squareSize - 1, squareSize - 1));
+#ifdef _DEBUG
 	sf::RectangleShape ro(sf::Vector2f(4, 4));
 	ro.setOrigin(-squareSize / 2 + 2, -squareSize / 2 + 2);
+#endif
 
 	auto stateColor = [](int state)
 		{
@@ -256,7 +527,7 @@ void Scene::print()
 	auto visible = [this](cvr pos)
 	{
 			return pos.x >= -squareSize && pos.y >= -squareSize && pos.x < viewport && pos.y < viewport;
-		};
+	};
 	// wires
 	for (auto wg : wireGroups)
 	{
@@ -270,6 +541,7 @@ void Scene::print()
 			window.draw(r);
 			}
 		}
+#ifdef _DEBUG
 		for (auto& orientation : wg->tileOrientations)
 		{
 			auto pixelcoords = ctp(orientation.first);
@@ -294,39 +566,41 @@ void Scene::print()
 				window.draw(ro);
 			}
 		}
+#endif
 	}
 	// gates
 	for (auto gate : gates)
 	{
-		if (visible(ctp(gate->pos)))
+		if (visible(ctp(gate->pos())))
 		{
-			r.setPosition(ctp(gate->pos));
+			r.setPosition(ctp(gate->pos()));
 			r.setFillColor(stateColor(gate->state()));
 			r.setTexture(&textures[static_cast<int>(gate->type())]);
 			window.draw(r);
 		}
-
-		auto pixelcoords = ctp(gate->pos);
-		if (gate->orientation.hasConnection(Tile::N))
+#ifdef _DEBUG
+		auto pixelcoords = ctp(gate->pos());
+		if (gate->orientation().hasConnection(Tile::N))
 		{
 			ro.setPosition(pixelcoords.x, pixelcoords.y - 8);
 			window.draw(ro);
 		}
-		if (gate->orientation.hasConnection(Tile::S))
+		if (gate->orientation().hasConnection(Tile::S))
 		{
 			ro.setPosition(pixelcoords.x, pixelcoords.y + 8);
 			window.draw(ro);
 		}
-		if (gate->orientation.hasConnection(Tile::W))
+		if (gate->orientation().hasConnection(Tile::W))
 		{
 			ro.setPosition(pixelcoords.x - 8, pixelcoords.y);
 			window.draw(ro);
 		}
-		if (gate->orientation.hasConnection(Tile::E))
+		if (gate->orientation().hasConnection(Tile::E))
 		{
 			ro.setPosition(pixelcoords.x + 8, pixelcoords.y);
 			window.draw(ro);
 		}
+#endif
 	}
 	// crosses
 	r.setFillColor(sf::Color::White);
@@ -388,6 +662,7 @@ void Scene::tick()
 		}
 	}
 	updatedGates.clear();
+	// update wires
 	for (auto wire : updatedWires)
 	{
 		updatedGates.insert(wire->outputs().begin(), wire->outputs().end());
@@ -420,6 +695,10 @@ void Scene::eventLoop()
 				if (e.key.code == sf::Mouse::Right)
 				{
 					rightClick(ptc(sf::Mouse::getPosition(window)));
+				}
+				else if (e.key.code == sf::Mouse::Left)
+				{
+					leftClick(ptc(sf::Mouse::getPosition(window)));
 				}
 			}
 		}

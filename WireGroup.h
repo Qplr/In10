@@ -16,13 +16,14 @@ class WireGroup: public Tile
 {
 	std::map<v, Tile::Type> wireTiles;
 	std::map<v, Orientation> tileOrientations;
-	v min, max;
 public:
+	WireGroup(std::vector<std::pair<v, Tile::Type>> pos);
 	WireGroup(v pos, Tile::Type type);
-	WireGroup(WireGroup&& another);
 	WireGroup(const WireGroup& another) = delete;
 
 	void merge(WireGroup&& another);
+	virtual bool contains(cvr pos) const override { return wireTiles.contains(pos); }
+	virtual Orientation& orientation(cvr pos = EasyVector()) { return tileOrientations[pos]; }
 
 	friend class Scene;
 	friend class Gate;

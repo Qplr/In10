@@ -8,14 +8,17 @@
 
 class WireGroup;
 
-class Gate: public Tile
+class Gate : public Tile
 {
-	v pos;
-	Orientation orientation;
+	v _pos;
+	Orientation _orientation;
 public:
-	Gate(Gate&& another);
 	Gate(const Gate& another) = delete;
 	Gate(v pos, Type type);
+
+	v pos() const { return _pos; }
+	virtual Orientation& orientation(cvr pos = EasyVector()) override { return _orientation; };
+	virtual bool contains(cvr pos) const { return pos == _pos; }
 
 	friend class Scene;
 	friend class WireGroup;
