@@ -4,10 +4,12 @@
 
 #include "defines.h"
 
-class EasyVector: public sf::Vector2i
+class EasyVector : public sf::Vector2i
 {
 public:
 	operator long long() const;
+	//bool operator<(const EasyVector& rhs) const { return x < rhs.x || y < rhs.y; }
+	//bool operator==(const EasyVector& rhs) const { return x == rhs.x && y == rhs.y; }
 	operator sf::Vector2f() const;
 	EasyVector() {}
 	EasyVector(int x, int y) : sf::Vector2i(x, y) {}

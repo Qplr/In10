@@ -16,6 +16,7 @@ public:
 
 	inline bool hasConnection(Tile::Side side) const { return hasInputFrom(side) || hasOutputTo(side); }
 	inline void setConnection(Tile::Side side) { setInputFrom(side); setOutputTo(side); }
+	inline void unSetConnection(Tile::Side side) { unSetInputFrom(side); unSetOutputTo(side); }
 
 	inline void setInputFrom(Tile::Side side) { mask |= sideToMask(side); }
 	inline void setOutputTo(Tile::Side side) { mask |= (sideToMask(side) << 4); }
