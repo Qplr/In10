@@ -16,6 +16,10 @@ class Scene
 
 	std::vector<WireGroup*> wireGroups;
 	std::vector<Gate*> gates;
+
+	void deleteWireGroup(int index);
+	void deleteGate(int index);
+
 	std::set<v> crosses;
 	int selectedTile = 0;
 
@@ -34,7 +38,9 @@ class Scene
 	v ptc(cvr pixels)const;
 	v ctp(cvr coords)const;
 
+#ifdef _DEBUG
 	void debug()const;
+#endif
 public:
 	Scene();
 	~Scene();

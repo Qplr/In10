@@ -2,7 +2,7 @@
 #include "Gate.h"
 
 WireGroup::WireGroup(std::vector<std::pair<v, Tile::Type>> pos)
-	:Tile(Tile::VOID)
+	:Tile(Tile::WIRE)
 {
 	for (auto i = pos.begin(); i != pos.end(); i++)
 		wireTiles.insert(*i);
