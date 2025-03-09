@@ -1,25 +1,17 @@
 #include "WireGroup.h"
 #include "Gate.h"
 
-WireGroup::WireGroup(v pos, Tile::Type type)
+WireGroup::WireGroup(std::vector<std::pair<v, Tile::Type>> pos)
 	:Tile(Tile::VOID)
 {
-	wireTiles.insert({ pos, type });
-	min = pos;
-	max = pos;
+	for (auto i = pos.begin(); i != pos.end(); i++)
+		wireTiles.insert(*i);
 }
 
-WireGroup::WireGroup(WireGroup&& another)
-	:Tile(Tile::VOID)
+WireGroup::WireGroup(v pos, Tile::Type type)
+	:Tile(Tile::WIRE)
 {
-	_state = another.state(); // copy state
-	wireTiles = std::move(another.wireTiles);
-	tileOrientations = std::move(another.tileOrientations);
-	for (auto input : another.inputs()) // inherit inputs from another
-		input->addOutput(this);
-	for (auto output : another.outputs()) // inherit outputs from another
-		output->addInput(this);
-	another.unlinkAll(); // make sure that another is no longer referenced
+	wireTiles.insert(std::make_pair(pos, type));
 }
 
 void WireGroup::merge(WireGroup&& another)
@@ -33,12 +25,13 @@ void WireGroup::merge(WireGroup&& another)
 	{
 		addOutput(output);
 		output->addInput(this);
+		output->removeInput(&another);
 	}
 	for (auto input : another.inputs()) // inherit inputs from another
 	{
 		addInput(input);
 		input->addOutput(this);
+		input->removeOutput(&another);
 	}
-	another.unlinkAll(); // make sure that another is no longer referenced
 }
 

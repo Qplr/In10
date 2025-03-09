@@ -34,9 +34,9 @@ void Tile::unlink(Tile* wg)
 
 void Tile::unlinkAll()
 {
-	for (auto& input : _inputs)
+	for (auto input : _inputs)
 		unlink(input);
-	for (auto& output : _outputs)
+	for (auto output : _outputs)
 		unlink(output);
 }
 

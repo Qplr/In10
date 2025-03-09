@@ -3,6 +3,7 @@
 #include "defines.h"
 #include "vector"
 
+class Orientation;
 class Tile
 {
 public:
@@ -36,7 +37,8 @@ public:
 	void unlink(Tile* wg);
 	void unlinkAll();
 
-	
+	virtual bool contains(cvr pos) const = 0; // for gate - compares to its pos, for wiregroup - calls contains on wireTiles
+	virtual Orientation& orientation(cvr pos = EasyVector()) = 0; // for gate - ignored, for wiregroup - returns tileOrinetations
 
 
 	static const std::vector<Tile::Type> tiles;
