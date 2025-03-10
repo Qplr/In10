@@ -1,4 +1,4 @@
-#include <format>
+#include <fmt/format.h>
 
 #include "Display.h"
 
@@ -21,7 +21,7 @@ Display::Display(Scene& source): _source(source)
 	textures.assign(Tile::tiles.size(), sf::Texture());
 	for (int i = 0; i < Tile::tiles.size(); i++)
 	{
-		if (!textures[i].loadFromFile(std::format("resources/{}.bmp", Tile::tileStrName.at(Tile::tiles.at(i)))))
+		if (!textures[i].loadFromFile(fmt::format("resources/{}.bmp", Tile::tileStrName.at(Tile::tiles.at(i)))))
 		{
 			// texture missng
 			// sf::Text t(std::format("missing texture: resources/{}.bmp", Tile::tileStrName.at(Tile::tiles.at(i))), sf::Font());
