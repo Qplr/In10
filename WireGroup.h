@@ -14,18 +14,18 @@ class Gate;
 
 class WireGroup: public Tile
 {
-	std::map<v, Tile::Type> wireTiles;
-	std::map<v, Orientation> tileOrientations;
+	std::map<v, Tile::Type> _wireTiles;
+	std::map<v, Orientation> _tileOrientations;
 public:
 	WireGroup(std::vector<std::pair<v, Tile::Type>> pos);
 	WireGroup(v pos, Tile::Type type);
 	WireGroup(const WireGroup& another) = delete;
 
-	void merge(WireGroup&& another);
-	virtual bool contains(cvr pos) const override { return wireTiles.contains(pos); }
-	virtual Orientation& orientation(cvr pos = EasyVector()) { return tileOrientations[pos]; }
+	std::map<v, Tile::Type>& wireTiles() { return _wireTiles; }
+	std::map<v, Orientation>& tileOrientations() { return _tileOrientations; }
 
-	friend class Scene;
-	friend class Gate;
+	void merge(WireGroup&& another);
+	virtual bool contains(cvr pos) const override { return _wireTiles.contains(pos); }
+	virtual Orientation& orientation(cvr pos = EasyVector()) { return _tileOrientations[pos]; }
 };
 

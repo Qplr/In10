@@ -5,21 +5,20 @@ WireGroup::WireGroup(std::vector<std::pair<v, Tile::Type>> pos)
 	:Tile(Tile::WIRE)
 {
 	for (auto i = pos.begin(); i != pos.end(); i++)
-		wireTiles.insert(*i);
+		_wireTiles.insert(*i);
 }
 
 WireGroup::WireGroup(v pos, Tile::Type type)
 	:Tile(Tile::WIRE)
 {
-	wireTiles.insert(std::make_pair(pos, type));
+	_wireTiles.insert(std::make_pair(pos, type));
 }
 
 void WireGroup::merge(WireGroup&& another)
 {
 	_state |= another.state();
-	wireTiles.merge(std::move(another.wireTiles)); // merge tiles
-
-	tileOrientations.merge(std::move(another.tileOrientations));
+	_wireTiles.merge(std::move(another._wireTiles)); // merge tiles
+	_tileOrientations.merge(std::move(another._tileOrientations));
 
 	for (auto output : another.outputs()) // inherit outputs from another
 	{
