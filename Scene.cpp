@@ -1,5 +1,9 @@
 #include "Scene.h"
 #include "SFML/Graphics.hpp"
+<<<<<<< HEAD
+=======
+#include <fmt/format.h>
+>>>>>>> 0f62554 (Changed format to fmt/format, and created cmakelists)
 #include <numeric>
 #include <time.h>
 #include <stack>
@@ -138,7 +142,7 @@ WireGroup* Scene::isolateIfPossible(WireGroup* wg, v pos, Tile::Side side)
 	{
 		v stepPos = wirePosAndIndex.first; // make a wire to this side a first step
 		Tile::Side origin = Tile::reverse(side); // set origin
-		
+
 		toStepTiles.push(std::make_pair(stepPos, origin)); // first step
 
 		// collect isolated tiles
@@ -229,6 +233,24 @@ void Scene::debug() const
 Scene::Scene()
 {
 
+<<<<<<< HEAD
+=======
+	textures.assign(Tile::tiles.size(), sf::Texture());
+	for (int i = 0; i < Tile::tiles.size(); i++)
+	{
+		if (!textures[i].loadFromFile(fmt::format("resources/{}.bmp", Tile::tileStrName.at(Tile::tiles.at(i)))))
+		{
+			// texture missng
+			// sf::Text t(std::format("missing texture: resources/{}.bmp", Tile::tileStrName.at(Tile::tiles.at(i))), sf::Font());
+			abort();
+		}
+		else if (auto size = textures[i].getSize(); size.x != textureSize || size.y != textureSize)
+		{
+			// incorrect texture size
+			abort();
+		}
+	}
+>>>>>>> 0f62554 (Changed format to fmt/format, and created cmakelists)
 }
 
 Scene::~Scene()
@@ -299,8 +321,13 @@ void Scene::placeWire(cvr pos, Tile::Type type)
 
 
 	auto newWireGroup = new WireGroup(pos, type); // new group with new wire
+<<<<<<< HEAD
 	_wireGroups.push_back(newWireGroup);
 	
+=======
+	wireGroups.push_back(newWireGroup);
+
+>>>>>>> 0f62554 (Changed format to fmt/format, and created cmakelists)
 	for (auto direction : Tile::directions) // for every direction
 		connectIfPossible(newWireGroup, pos, direction);
 
@@ -353,8 +380,13 @@ void Scene::placeCross(cvr pos)
 	if (tileType(pos) != Tile::VOID)
 		return;
 
+<<<<<<< HEAD
 	_crosses.insert(pos);
 	
+=======
+	crosses.insert(pos);
+
+>>>>>>> 0f62554 (Changed format to fmt/format, and created cmakelists)
 	for (auto direction : { Tile::N, Tile::S })
 		if (auto wirePosAndIndex = sideConnectsToWire(pos, direction); wirePosAndIndex.second != -1)
 			connectIfPossible(_wireGroups[wirePosAndIndex.second], wirePosAndIndex.first, Tile::reverse(direction));
@@ -454,7 +486,7 @@ void Scene::removeGate(cvr pos)
 void Scene::removeCross(cvr pos)
 {
 	std::vector<WireGroup*> newWireGroups;
-	
+
 	int verticalIndex = -1;
 	int horizontalIndex = -1;
 
@@ -493,6 +525,125 @@ void Scene::removeCross(cvr pos)
 #endif
 }
 
+<<<<<<< HEAD
+=======
+void Scene::print()
+{
+	window.clear();
+	sf::RectangleShape r(sf::Vector2f(squareSize - 1, squareSize - 1));
+#ifdef _DEBUG
+	sf::RectangleShape ro(sf::Vector2f(4, 4));
+	ro.setOrigin(-squareSize / 2 + 2, -squareSize / 2 + 2);
+#endif
+
+	auto stateColor = [](int state)
+		{
+			return state ? sf::Color::White : sf::Color(64, 64, 64);
+		};
+	auto visible = [this](cvr pos)
+	{
+			return pos.x >= -squareSize && pos.y >= -squareSize && pos.x < viewport && pos.y < viewport;
+	};
+	// wires
+	for (auto wg : wireGroups)
+	{
+		r.setFillColor(stateColor(wg->state()));
+		for (auto& wireTile : wg->wireTiles)
+		{
+			if (visible(ctp(wireTile.first)))
+			{
+			r.setPosition(ctp(wireTile.first));
+			r.setTexture(&textures[static_cast<int>(wireTile.second)]);
+			window.draw(r);
+			}
+		}
+#ifdef _DEBUG
+		for (auto& orientation : wg->tileOrientations)
+		{
+			auto pixelcoords = ctp(orientation.first);
+			if (orientation.second.hasConnection(Tile::N))
+			{
+				ro.setPosition(pixelcoords.x, pixelcoords.y - 8);
+				window.draw(ro);
+			}
+			if (orientation.second.hasConnection(Tile::S))
+			{
+				ro.setPosition(pixelcoords.x, pixelcoords.y + 8);
+				window.draw(ro);
+			}
+			if (orientation.second.hasConnection(Tile::W))
+			{
+				ro.setPosition(pixelcoords.x - 8, pixelcoords.y);
+				window.draw(ro);
+			}
+			if (orientation.second.hasConnection(Tile::E))
+			{
+				ro.setPosition(pixelcoords.x + 8, pixelcoords.y);
+				window.draw(ro);
+			}
+		}
+#endif
+	}
+	// gates
+	for (auto gate : gates)
+	{
+		if (visible(ctp(gate->pos())))
+		{
+			r.setPosition(ctp(gate->pos()));
+			r.setFillColor(stateColor(gate->state()));
+			r.setTexture(&textures[static_cast<int>(gate->type())]);
+			window.draw(r);
+		}
+#ifdef _DEBUG
+		auto pixelcoords = ctp(gate->pos());
+		if (gate->orientation().hasConnection(Tile::N))
+		{
+			ro.setPosition(pixelcoords.x, pixelcoords.y - 8);
+			window.draw(ro);
+		}
+		if (gate->orientation().hasConnection(Tile::S))
+		{
+			ro.setPosition(pixelcoords.x, pixelcoords.y + 8);
+			window.draw(ro);
+		}
+		if (gate->orientation().hasConnection(Tile::W))
+		{
+			ro.setPosition(pixelcoords.x - 8, pixelcoords.y);
+			window.draw(ro);
+		}
+		if (gate->orientation().hasConnection(Tile::E))
+		{
+			ro.setPosition(pixelcoords.x + 8, pixelcoords.y);
+			window.draw(ro);
+		}
+#endif
+	}
+	// crosses
+	r.setFillColor(sf::Color::White);
+	for (auto cross : crosses)
+	{
+		if (visible(ctp(cross)))
+		{
+			r.setPosition(ctp(cross));
+			r.setTexture(&textures[Tile::CROSS]);
+			window.draw(r);
+		}
+	}
+	// the selection panel
+	r.setSize(v(32, 32));
+	r.setOutlineThickness(1);
+	for (int i = 0; i < textures.size(); i++)
+	{
+		r.setTexture(&textures[i]);
+		r.setPosition(4, 4 + i * 36);
+		r.setFillColor(stateColor(selectedTile == Tile::tiles[i]));
+		window.draw(r);
+	}
+
+	window.display();
+}
+
+>>>>>>> 0f62554 (Changed format to fmt/format, and created cmakelists)
 void Scene::tick()
 {
 	if (clock() > lastTick + CLOCKS_PER_SEC / tps)
