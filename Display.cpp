@@ -2,14 +2,20 @@
 
 #include "Display.h"
 
-v Display::ptc(cvr pixels) const
+void Display::cameraBounds()
 {
-	return pixels / squareSize;
+	camPosUnits.x = std::max(camPosUnits.x, 1.f);
+	camPosUnits.y = std::max(camPosUnits.y, 1.f);
 }
 
-v Display::ctp(cvr coords) const
+sf::Vector2f Display::ptc(cvr pixels) const
 {
-	return sf::Vector2i(coords) * squareSize;
+	return sf::Vector2f(pixels) / squareSize + camPosUnits;
+}
+
+v Display::ctp(const sf::Vector2f& coords) const
+{
+	return (coords - camPosUnits) * squareSize;
 }
 
 Display::Display(Scene& source): _source(source)
@@ -34,14 +40,21 @@ Display::Display(Scene& source): _source(source)
 		}
 	}
 }
-
-
+#include <iostream>
 void Display::print()
 {
 	if (clock() > lastFrame + CLOCKS_PER_SEC / fps)
 		lastFrame = clock();
 	else
 		return;
+
+	if (abs(squareSize - targetSquareSize) > 0.0001)
+	{
+		auto pivotUnits = sf::Vector2f(sf::Mouse::getPosition(_window)) / squareSize;
+		squareSize += (targetSquareSize > squareSize ? 1 : -1);
+		camPosUnits += pivotUnits - sf::Vector2f(sf::Vector2f(sf::Mouse::getPosition(_window))) / squareSize;
+		std::cout << "square size: " << squareSize << " target: " << targetSquareSize << std::endl;
+	}
 
 	_window.clear();
 	sf::RectangleShape r(sf::Vector2f(squareSize - 1, squareSize - 1));
@@ -56,7 +69,7 @@ void Display::print()
 		};
 	auto visible = [this](cvr pos)
 		{
-			return pos.x >= -squareSize && pos.y >= -squareSize && pos.x < viewport && pos.y < viewport;
+			return pos.x >= -squareSize && pos.y >= -squareSize && pos.x < float(_window.getSize().x) && pos.y < float(_window.getSize().y);
 		};
 	// wires
 	for (auto wg : _source.wireGroups())
@@ -64,9 +77,9 @@ void Display::print()
 		r.setFillColor(stateColor(wg->state()));
 		for (auto& wireTile : wg->wireTiles())
 		{
-			if (visible(ctp(wireTile.first)))
+			if (auto wirePos = ctp(sf::Vector2f(wireTile.first)); visible(wirePos))
 			{
-				r.setPosition(ctp(wireTile.first));
+				r.setPosition(wirePos);
 				r.setTexture(&textures[static_cast<int>(wireTile.second)]);
 				_window.draw(r);
 			}
@@ -74,7 +87,7 @@ void Display::print()
 #ifdef _DEBUG
 		for (auto& orientation : wg->tileOrientations())
 		{
-			auto pixelcoords = ctp(orientation.first);
+			auto pixelcoords = ctp(sf::Vector2f(orientation.first));
 			if (orientation.second.hasConnection(Tile::N))
 			{
 				ro.setPosition(pixelcoords.x, pixelcoords.y - 8);
@@ -101,15 +114,15 @@ void Display::print()
 	// gates
 	for (auto gate : _source.gates())
 	{
-		if (visible(ctp(gate->pos())))
+		if (auto gatePos = ctp(sf::Vector2f(gate->pos())); visible(gatePos))
 		{
-			r.setPosition(ctp(gate->pos()));
+			r.setPosition(gatePos);
 			r.setFillColor(stateColor(gate->state()));
 			r.setTexture(&textures[static_cast<int>(gate->type())]);
 			_window.draw(r);
 		}
 #ifdef _DEBUG
-		auto pixelcoords = ctp(gate->pos());
+		auto pixelcoords = ctp(sf::Vector2f(gate->pos()));
 		if (gate->orientation().hasConnection(Tile::N))
 		{
 			ro.setPosition(pixelcoords.x, pixelcoords.y - 8);
@@ -136,9 +149,9 @@ void Display::print()
 	r.setFillColor(sf::Color::White);
 	for (auto cross : _source.crosses())
 	{
-		if (visible(ctp(cross)))
+		if (auto crossPos = ctp(sf::Vector2f(cross)); visible(crossPos))
 		{
-			r.setPosition(ctp(cross));
+			r.setPosition(crossPos);
 			r.setTexture(&textures[Tile::CROSS]);
 			_window.draw(r);
 		}
@@ -155,4 +168,17 @@ void Display::print()
 	}
 
 	_window.display();
+}
+
+void Display::zoom(int delta)
+{
+	targetSquareSize += int(delta * log(targetSquareSize));
+	targetSquareSize = std::min(targetSquareSize, maxSquareSize);
+	targetSquareSize = std::max(targetSquareSize, minSquareSize);
+}
+
+void Display::move(v offsetPixels)
+{
+	camPosUnits += sf::Vector2f(offsetPixels) / squareSize;
+	cameraBounds();
 }

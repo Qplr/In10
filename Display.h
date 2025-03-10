@@ -4,8 +4,11 @@
 
 class Display
 {
-	const int viewport = 800, fps = 60, textureSize = 32;
-	int squareSize = 25;
+	const int fps = 60, textureSize = 32;
+	const float maxSquareSize = 128, minSquareSize = 8;
+	float squareSize = textureSize, targetSquareSize = squareSize;
+	sf::Vector2f camPosUnits = {1.f, 1.f};
+	void cameraBounds();
 
 	clock_t lastFrame = clock();
 	sf::RenderWindow _window;
@@ -13,11 +16,13 @@ class Display
 
 	Scene& _source;
 public:
-	v ptc(cvr pixels)const;
-	v ctp(cvr coords)const;
+	void resize() { _window.create(sf::VideoMode(_window.getSize().x, _window.getSize().y), ""); }
+	sf::Vector2f ptc(cvr pixels)const;
+	v ctp(const sf::Vector2f& coords)const;
 	Display(Scene& source);
 	sf::RenderWindow& window() { return _window; }
 	void print();
-	void zoom(int delta) { squareSize += delta; }
+	void zoom(int delta);
+	void move(v offsetPixels);
 };
 
