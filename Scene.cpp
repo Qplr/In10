@@ -10,24 +10,12 @@
 
 void Scene::deleteWireGroup(int index)
 {
-#ifdef _DEBUG
-	if (updatedWires.erase(_wireGroups[index]))
-		std::cout << "removed updated wire" << std::endl;
-#else
-	updatedWires.erase(_wireGroups[index]);
-#endif
 	delete _wireGroups[index];
 	_wireGroups.erase(_wireGroups.begin() + index);
 }
 
 void Scene::deleteGate(int index)
 {
-#ifdef _DEBUG
-	if (updatedGates.erase(_gates[index]))
-		std::cout << "removed updated gate" << std::endl;
-#else
-	updatedGates.erase(_gates[index]);
-#endif
 	delete _gates[index];
 	_gates.erase(_gates.begin() + index);
 }

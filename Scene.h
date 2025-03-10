@@ -33,6 +33,14 @@ class Scene
 	void connectIfPossible(WireGroup* wg, v pos, Tile::Side direction);
 	WireGroup* isolateIfPossible(WireGroup* wg, v pos, Tile::Side side);
 
+	void placeWire(cvr pos, Tile::Type type);
+	void placeGate(cvr pos, Tile::Type type);
+	void placeCross(cvr pos);
+
+	void removeWire(cvr pos);
+	void removeGate(cvr pos);
+	void removeCross(cvr pos);
+
 #ifdef _DEBUG
 	void debug()const;
 #endif
@@ -48,14 +56,6 @@ public:
 	void rightClick(cvr pos);
 	void scrollSelectedTile(int delta) { _selectedTileId = (_selectedTileId - delta + Tile::tiles.size()) % Tile::tiles.size(); _selectedTile = Tile::tiles[_selectedTileId]; }
 	Tile::Type selectedTile() const { return _selectedTile; }
-
-	void placeWire(cvr pos, Tile::Type type);
-	void placeGate(cvr pos, Tile::Type type);
-	void placeCross(cvr pos);
-
-	void removeWire(cvr pos);
-	void removeGate(cvr pos);
-	void removeCross(cvr pos);
 	
 	void tick();
 };
