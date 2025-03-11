@@ -4,7 +4,7 @@
 
 class Display
 {
-	const int fps = 60, textureSize = 32;
+	const int textureSize = 32;
 	const float maxSquareSize = 128, minSquareSize = 8;
 	float squareSize = textureSize, targetSquareSize = squareSize;
 	sf::Vector2f camPosUnits = {1.f, 1.f};
