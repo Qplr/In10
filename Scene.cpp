@@ -10,13 +10,17 @@
 
 void Scene::deleteWireGroup(int index)
 {
+	_wireGroups[index]->unlinkAll();
 	delete _wireGroups[index];
+	updatedWires.erase(_wireGroups[index]);
 	_wireGroups.erase(_wireGroups.begin() + index);
 }
 
 void Scene::deleteGate(int index)
 {
+	_gates[index]->unlinkAll();
 	delete _gates[index];
+	updatedGates.erase(_gates[index]);
 	_gates.erase(_gates.begin() + index);
 }
 
@@ -128,6 +132,7 @@ WireGroup* Scene::isolateIfPossible(WireGroup* wg, v pos, Tile::Side side)
 		Tile::Side origin = Tile::reverse(side); // set origin
 		
 		toStepTiles.push(std::make_pair(stepPos, origin)); // first step
+		_wireGroups[wirePosAndIndex.second]->tileOrientations()[stepPos].unSetConnection(Tile::reverse(side)); // unset connection to origin
 
 		// collect isolated tiles
 		while (!toStepTiles.empty())
@@ -139,8 +144,6 @@ WireGroup* Scene::isolateIfPossible(WireGroup* wg, v pos, Tile::Side side)
 			isolatedTiles.push_back(std::make_pair(stepPos, wg->wireTiles()[stepPos])); //save tile
 			wg->wireTiles().erase(stepPos); // delete from original wire group (also to protect from loops)
 
-			// TODO pass <wg> to <sideConnectsToWire>, <outputs> and <inputs> to <sideConnectsToGate> to reduce search
-			// as we dont really need their indexes to reconnect
 			for (auto direction : Tile::directions)
 			{
 				if (direction == origin) // don't look back
@@ -148,9 +151,19 @@ WireGroup* Scene::isolateIfPossible(WireGroup* wg, v pos, Tile::Side side)
 				bool inputFrom = wg->tileOrientations()[stepPos].hasInputFrom(direction); // do we have input from direction
 				bool outputTo = wg->tileOrientations()[stepPos].hasOutputTo(direction); // do we have an output to direction
 				if (inputFrom && !outputTo) // only input from direction (from gate)
-					isolatedInputs.push_back(sideConnectsToGate(stepPos, direction).second);
+				{
+					if (auto gatePosAndIndex = sideConnectsToGate(stepPos, direction); gatePosAndIndex.second != -1)
+						isolatedInputs.push_back(gatePosAndIndex.second);
+					else
+						std::cout << "Tile at " << stepPos.x << ' ' << stepPos.y << " has dangling connection to side " << direction << std::endl;
+				}
 				else if (!inputFrom && outputTo) // only output to direction (to gate)
-					isolatedOutputs.push_back(sideConnectsToGate(stepPos, direction).second);
+				{
+					if (auto gatePosAndIndex = sideConnectsToGate(stepPos, direction); gatePosAndIndex.second != -1)
+						isolatedOutputs.push_back(gatePosAndIndex.second);
+					else
+						std::cout << "Tile at " << stepPos.x << ' ' << stepPos.y << " has dangling connection to side " << direction << std::endl;
+				}
 				else if (inputFrom && outputTo) // both input and output (wire)
 				{
 					if (auto wirePosAndIndex = sideConnectsToWire(stepPos, direction); wirePosAndIndex.second != -1) // check if there is actually a wire or we did this step already
@@ -491,41 +504,44 @@ void Scene::tick()
 	// update _gates
 	for (auto gate : updatedGates)
 	{
-		updatedWires.insert(gate->outputs().begin(), gate->outputs().end());
+		bool changed = false;
 		switch (gate->type())
 		{
 		case Tile::SWITCH:
-			gate->setState(!gate->state());
+			changed = gate->setState(!gate->state());
 			break;
 		case Tile::OR:
-			gate->setState(std::accumulate(gate->inputs().begin(),gate->inputs().end(), false, [](bool result, Tile* second) {return result || second->state(); }));
+			changed = gate->setState(std::accumulate(gate->inputs().begin(),gate->inputs().end(), false, [](bool result, Tile* second) {return result || second->state(); }));
 			break;
 		case Tile::NOR:
-			gate->setState(std::accumulate(gate->inputs().begin(), gate->inputs().end(), true, [](bool result, Tile* second) {return result && !second->state(); }));
+			changed = gate->setState(std::accumulate(gate->inputs().begin(), gate->inputs().end(), true, [](bool result, Tile* second) {return result && !second->state(); }));
 			break;
 		case Tile::AND:
-			gate->setState(std::accumulate(gate->inputs().begin(), gate->inputs().end(), true, [](bool result, Tile* second) {return result && second->state(); }));
+			changed = gate->setState(std::accumulate(gate->inputs().begin(), gate->inputs().end(), true, [](bool result, Tile* second) {return result && second->state(); }));
 			break;
 		case Tile::NAND:
-			gate->setState(std::accumulate(gate->inputs().begin(), gate->inputs().end(), false, [](bool result, Tile* second) {return result || !second->state(); }));
+			changed = gate->setState(std::accumulate(gate->inputs().begin(), gate->inputs().end(), false, [](bool result, Tile* second) {return result || !second->state(); }));
 			break;
 		case Tile::XOR:
-			gate->setState(std::accumulate(gate->inputs().begin(), gate->inputs().end(), false, [](bool result, Tile* second) {return result ^ second->state(); }));
+			changed = gate->setState(std::accumulate(gate->inputs().begin(), gate->inputs().end(), false, [](bool result, Tile* second) {return result ^ second->state(); }));
 			break;
 		case Tile::XNOR:
-			gate->setState(
+			changed = gate->setState(
 				std::accumulate(gate->inputs().begin(), gate->inputs().end(), true, [](bool result, Tile* second) {return result && second->state(); }) // AND
 				||
 				std::accumulate(gate->inputs().begin(), gate->inputs().end(), true, [](bool result, Tile* second) {return result && !second->state(); })); // NOR
 			break;
 		}
+		if(changed)
+			updatedWires.insert(gate->outputs().begin(), gate->outputs().end());
 	}
 	updatedGates.clear();
 	// update wires
 	for (auto wire : updatedWires)
 	{
-		updatedGates.insert(wire->outputs().begin(), wire->outputs().end());
-		wire->setState(std::accumulate(wire->inputs().begin(), wire->inputs().end(), false, [](bool result, Tile* second) {return result || second->state(); }));
+		bool changed = wire->setState(std::accumulate(wire->inputs().begin(), wire->inputs().end(), false, [](bool result, Tile* second) {return result || second->state(); }));
+		if (changed)
+			updatedGates.insert(wire->outputs().begin(), wire->outputs().end());
 	}
 	updatedWires.clear();
 }

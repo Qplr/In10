@@ -21,7 +21,6 @@ v Display::ctp(const sf::Vector2f& coords) const
 Display::Display(Scene& source): _source(source)
 {
 	_window.create(sf::VideoMode(800, 800), "");
-	_window.setFramerateLimit(fps);
 	_window.setVerticalSyncEnabled(true);
 
 	textures.assign(Tile::tiles.size(), sf::Texture());
@@ -43,11 +42,6 @@ Display::Display(Scene& source): _source(source)
 #include <iostream>
 void Display::print()
 {
-	if (clock() > lastFrame + CLOCKS_PER_SEC / fps)
-		lastFrame = clock();
-	else
-		return;
-
 	if (abs(squareSize - targetSquareSize) > 0.0001)
 	{
 		auto pivotUnits = sf::Vector2f(sf::Mouse::getPosition(_window)) / squareSize;

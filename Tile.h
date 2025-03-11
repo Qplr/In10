@@ -26,7 +26,7 @@ public:
 	Tile(Type type) :_type(type) {}
 	Type type() const { return _type; }
 	bool state() const { return _state; }
-	void setState(bool newState) { _state = newState; }
+	bool setState(bool newState) { std::swap(_state, newState); return _state != newState; }
 	const std::vector<Tile*>& outputs() const { return _outputs; }
 	const std::vector<Tile*>& inputs() const { return _inputs; }
 	void addOutput(Tile* wg);
