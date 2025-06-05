@@ -1,8 +1,8 @@
 #include "EasyVector.h"
 
-EasyVector::operator long long() const
+bool operator<(const EasyVector& lhs, const EasyVector& rhs)
 {
-	return (x + y) * (x + y + 1) / 2 + y;
+	return lhs.x == rhs.x ? lhs.y < rhs.y :  lhs.x < rhs.x;
 }
 
 EasyVector::operator sf::Vector2f()
